@@ -27,6 +27,7 @@ abr_single_trial_data.columns = abr_single_trial_data.columns.astype('float')
 
 print('Fitting with XCsub algorithm')
 fit_results, fig_handle = ABRpresto.XCsub.estimate_threshold(abr_single_trial_data, **XCsubargs)
+fit_results['ABRpresto version'] = ABRpresto.get_version()
 
 print(f"Threshold is {fit_results['threshold']:.1f}, fit with: {fit_results['status_message']}")
 

@@ -31,6 +31,10 @@ The example data is stored as csv, see Example_fit_script.py for how it is loade
 
 The algorithm will output a dictionary of results and a figure, which are saved as json and png.
 
+### Figure output
+
+In the left column the figures show mean +/- SE of all trials in black, and median (or mean, depending on AVmode) for the two subsets. Waveforms are normalized (for each level all 3 lines are are scaled by the peak-to-peak of the mean of all trials). The right hand side shows mean correlation coefficient vs stimulus level. Sigmoid and power law fits to this data are shown in green and purple. The threshold is shown by the pink dashed line.
+
 ### Command line usage
 
 The algorithm can be run on the command line to process either a list of csv files, or a whole folder of csv files:

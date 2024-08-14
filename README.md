@@ -24,8 +24,8 @@ directly into your main Python environment):
 
 ## Usage
 
-See Example_fit_script.py for an example fitting a single waveform stack.
-The algorithm [Example_fit_script.py](scripts%2FExample_fit_script.py) expects data to be passed as a pandas dataframe with `polarity` and  `level` as indexes. Extra indexes will be dropped (for example `t0` in the example datasets).
+See [Example_fit_script.py](scripts%2FExample_fit_script.py) for an example fitting a single waveform stack.
+The algorithm expects data to be passed as a pandas dataframe with `polarity` and  `level` as indexes. Extra indexes will be dropped (for example `t0` in the example datasets).
 Column headers should be the time relative to stimulus onset in seconds.
 The example data is stored as csv, see Example_fit_script.py for how it is loaded and preprocessed before passing to the algorithm.
 

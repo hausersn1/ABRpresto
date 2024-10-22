@@ -65,11 +65,16 @@ Outputs
                 threshold = sigmoid_get_threshold(thresholdCriterion, *sigmoid_fit['params'])
                 bestFitType = 'sigmoid'
                 thdEstimationFailed = False
-        elif not((power_law_fit['yfit'][0] < thresholdCriterion) & (power_law_fit['yfit'][1] > thresholdCriterion)):
-            if (y[-1] <= thresholdCriterion) and ((y > thresholdCriterion).sum() <= 3):
+        elif not((power_law_fit['yfit'][0] < thresholdCriterion) & (power_law_fit['yfit'][-1] > thresholdCriterion)):
+            if (y > thresholdCriterion).sum() <= 2:
                 # Cases where noise pushed some levels above criterion, but couldn't fit. Can safely call inf
                 threshold = np.Inf
                 bestFitType = "most below criterion, but couldn't fit, threshold is inf"
+                thdEstimationFailed = False
+            elif (y < thresholdCriterion).sum() <= 2:
+                # Cases where noise pushed some levels below criterion, but couldn't fit. Can safely call -inf
+                threshold = -np.Inf
+                bestFitType = 'all above criterion, threshold is -inf'
                 thdEstimationFailed = False
             # Otherwise default remain: threshold=nan and thdEstimationFailed=False.
             # We want to take a closer look at these cases

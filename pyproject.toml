@@ -16,7 +16,7 @@ dependencies = [
 	"scipy >=1.2.1",
 	"pandas >=0.24.2",
 	"matplotlib >=3.0.0",
-    	"setuptools_scm",
+	"setuptools_scm",
 ]
 dynamic = ["version"]
 

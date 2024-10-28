@@ -6,16 +6,11 @@ import pandas as pd
 from pathlib import Path
 
 from cftsdata import abr
+import matplotlib.pyplot as plt
 
 
 def run_fit(path, reprocess=False, XCsubargs=None):
     path = Path(path)
-    fig_filename = path / f'{path.stem}_XCsub_fit.png'
-    json_filename = path / f'{path.stem}_XCsub_fit.json'
-
-    if not reprocess and fig_filename.exists() and json_filename.exists():
-        print(f"{path} already fitted with ABRpresto")
-        return
 
     if XCsubargs is None:
         XCsubargs = {
@@ -37,16 +32,26 @@ def run_fit(path, reprocess=False, XCsubargs=None):
     fh = abr.load(path)
     abr_single_trial_data = fh.get_epochs_filtered()
 
-    print('Fitting with XCsub algorithm')
-    fit_results, figure = XCsub.estimate_threshold(abr_single_trial_data, **XCsubargs)
-    fit_results['ABRpresto version'] = ABRpresto.get_version()
+    for freq in abr_single_trial_data.index.get_level_values('frequency').unique():
+        fig_filename = path.parent / f'{path.stem}_ABRpresto_fit {freq:.0f}.png'
+        json_filename = path.parent / f'{path.stem}_ABRpresto_fit {freq:.0f}.json'
 
-    print(f"Threshold is {fit_results['threshold']:.1f}, fit with: {fit_results['status_message']}")
+        if not reprocess and fig_filename.exists() and json_filename.exists():
+            print(f"{path} {freq:.0f} Hz already fit with ABRpresto")
+            continue
 
-    # Save summary figure and fit results
-    figure.savefig(fig_filename)
-    utils.write_json(fit_results, json_filename)
-    print(f"Exported fit results to {json_filename}")
+        print(f'Fitting {freq} with ABRpresto algorithm')
+        fit_results, figure = XCsub.estimate_threshold(abr_single_trial_data.loc[freq], **XCsubargs)
+        fit_results['ABRpresto version'] = ABRpresto.get_version()
+
+        print(f"Threshold is {fit_results['threshold']:.1f}, fit with: {fit_results['status_message']}")
+
+        # Save summary figure and fit results
+        figure.savefig(fig_filename)
+        utils.write_json(fit_results, json_filename)
+        print(f"Exported fit results to {json_filename}")
+
+        plt.close(figure)
 
 
 def iter_psi(path):

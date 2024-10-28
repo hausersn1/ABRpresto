@@ -132,7 +132,7 @@ Parameters
         dropped_all = all(all_values_0)
         log.warning(f'\n {all_values_0.sum()}/{len(all_values_0)} epochs in this dataset have values of all 0.'
                     f' Dropping these epochs.')
-        epochs.drop(index=all_values_0[all_values_0].index, inplace=True)
+        epochs = epochs[~all_values_0]
 
     #Count number of levels, polarities, trials per rep. Calculate fs (sampling frequency) for data)
     levels = epochs.index.get_level_values('level').unique().values
@@ -482,6 +482,7 @@ def plot_fit(levels, levels_, xc0, ABRtime, epochs_means, epochs_sems, pst_range
         ax[1].plot(levels, xc0.mean(axis=1), '.k', label='data mean', )
         # ax[1].plot(levels[levi], xc0[levi,:].mean(axis=1), '.k', label='data mean', )
         ax[1].set_ylim((-.3, 1.01))
+        yf = None
         if fit_XC0m['sigmoid_fit'] is not None:
             if fit_XC0m['bestFitType'] == 'sigmoid':
                 l = f"sigmoid fit,\nthresh={fit_XC0m['threshold']:.1f}"
@@ -507,6 +508,7 @@ def plot_fit(levels, levels_, xc0, ABRtime, epochs_means, epochs_sems, pst_range
                 lw = 1
                 ls = '-'
             ax[1].plot(levels, fit_XC0m['power_law_fit']['yfit'], color=colors[4], lw=lw, label=l, ls=ls)
+
         if fit_XC0m['threshold'] is not None:
             if fit_XC0m['threshold'] is np.inf:
                 l = 'thresh=inf\n(all levels below criterion)'
@@ -526,7 +528,7 @@ def plot_fit(levels, levels_, xc0, ABRtime, epochs_means, epochs_sems, pst_range
         ax[1].set_yticklabels(('0', '.2', '.4', '.6', '.8', '1'))
         ax[1].set_xlabel('Level (dB SPL)', fontsize=fs_labels)
         levi = (np.abs(levels-np.percentile(ax[1].get_xlim(),35))).argmin()
-        if yf[levi] < .8:
+        if (yf is None) or yf[levi] < .8:
             ax[1].legend(loc='upper left', bbox_to_anchor=(0, 1), frameon=True, fontsize=10 * fs_scale, framealpha=1)
         else:
             ax[1].legend(loc='lower right', bbox_to_anchor=(1, 0), frameon=True, fontsize=10 * fs_scale, framealpha=1)

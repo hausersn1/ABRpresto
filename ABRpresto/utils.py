@@ -3,6 +3,7 @@ from scipy import signal
 import json
 import scipy.optimize as optimize
 from pathlib import Path
+import pandas as pd
 
 
 def crossCorr(x1, x2, norm=False):
@@ -49,11 +50,11 @@ Outputs
 
     # 1 check if cc passes criterion
     if min(y) > thresholdCriterion * 1.1:  # Used a factor of 1.1 to allow a little extrapolation
-        threshold = -np.Inf
+        threshold = -np.inf
         bestFitType = 'all above criterion, threshold is -inf'
         thdEstimationFailed = False
     elif max(y) < thresholdCriterion:
-        threshold = np.Inf
+        threshold = np.inf
         bestFitType = 'all below criterion, threshold is inf'
         thdEstimationFailed = False
     else:
@@ -68,12 +69,12 @@ Outputs
         elif not((power_law_fit['yfit'][0] < thresholdCriterion) & (power_law_fit['yfit'][-1] > thresholdCriterion)):
             if (y > thresholdCriterion).sum() <= 2:
                 # Cases where noise pushed some levels above criterion, but couldn't fit. Can safely call inf
-                threshold = np.Inf
+                threshold = np.inf
                 bestFitType = "most below criterion, but couldn't fit, threshold is inf"
                 thdEstimationFailed = False
             elif (y < thresholdCriterion).sum() <= 2:
                 # Cases where noise pushed some levels below criterion, but couldn't fit. Can safely call -inf
-                threshold = -np.Inf
+                threshold = -np.inf
                 bestFitType = 'all above criterion, threshold is -inf'
                 thdEstimationFailed = False
             # Otherwise default remain: threshold=nan and thdEstimationFailed=False.
@@ -275,3 +276,214 @@ class AutoThJsonEncoder(json.JSONEncoder):
             return f'{obj.__module__}.{obj.__name__}'
         else:
             return super().default(obj)
+
+def load_fits(pth, save=True, algorithm = 'ABRpresto'):
+    mouse_num = []
+    timepoint = []
+    ear = []
+    frequency = []
+    threshold = []
+    status = []
+    status_msg = []
+    for filename in Path(pth).glob(f'*_{algorithm}_fit*.json'):
+        if 'Copy' in str(filename):
+            continue
+        D = json.load(open(filename))
+        threshold.append(D['threshold'])
+        mouse_num.append(int(str(filename).split('\\')[-1].split('_')[0][5:]))
+        timepoint.append(int(str(filename).split('\\')[-1].split('_')[1][9:]))
+        ear.append(str(filename).split('\\')[-1].split('_')[2].split(' ')[0])
+        frequency.append(int(str(filename).split(' ')[-1].split('.')[0]))
+        status.append(D['status'])
+        status_msg.append(D['status_message'])
+
+    df = pd.DataFrame(
+        {'threshold': threshold, 'id': mouse_num, 'timepoint': timepoint, 'ear': ear, 'frequency': frequency,
+         'status': status, 'status_message': status_msg})
+    if save:
+        save_pth = pth + f'{algorithm} thresholds.csv'
+        df.to_csv(save_pth, index=False)
+        print(f'Saved {len(df)} thresholds to {save_pth}')
+    return df
+
+def compare_thresholds(df, thresholders, impute_infs=True):
+    def set_ephys_id(DF):
+        DF['ephys_id_no_freq'] = DF['study'] + '_ID' + DF['id'].astype('str') + \
+                                 '_' + 'W' + \
+                                 DF.timepoint.astype('str') + '_' + DF.ear
+        DF['ephys_id'] = DF['ephys_id_no_freq'] + \
+                         '_' + DF['frequency'].astype('float').round(-2).astype('int').astype('str')
+        DF['ephys_dir'] = DF['study'] + '_' + DF.timepoint_unit.str.slice(0, 1).str.upper() + DF.timepoint.astype(
+            'str') + \
+                          '_ID' + DF['id'].astype('str')
+        DF['ephys_dir2'] = DF['ephys_dir'] + '_' + DF.ear + '_' + DF.assay + ' abr_io ' + DF.group
+        # DF['ephys_id'] = DF['ephys_id_dir']                     '_' + DF['frequency'].astype('float').round(-2).astype('int').astype('str')
+
+        return DF
+
+    # for i in range(len(thresholders)):
+    #     df[i] = set_ephys_id(df[i].reset_index())
+
+    if impute_infs:
+        for v in ['threshold', 'XCsubpublic threshold', 'manual threshold']:
+            ii = np.isinf(df[v]) & (df[v] < 0);
+            df.loc[ii, v] = df.loc[ii, 'min_level'] - 5
+            ii = np.isinf(df[v]) & (df[v] > 0);
+            df.loc[ii, v] = df.loc[ii, 'max_level'] + 5
+
+    if 'status_message' in df[1].keys():
+        C = df[1].set_index(DF_indicies)['status_message']
+        C.name = ('', 'status_message')
+        dfj = pd.concat((dfj, C.to_frame()), axis=1)
+
+    # dfj.loc[dfj[('', 'status_message')].isnull(), ('', 'status_message')] = ''
+    # dfj = dfj[dfj[('', 'status_message')].str.contains('power law')]
+
+    analyzers = thresholders[1:]
+    dfs_all = summarize_thd_diffs(dfj, analyzers, crits=(0, 5, 10))
+    dfj['threshold', 'diff'] = dfj['threshold', analyzers[0]] - dfj['threshold', 'THD']
+
+    binsize = 5
+
+    def pli(x_, y_, binsize=binsize):
+        print(f'Got {x_},{y_}')
+        if pli.x == x_ and pli.y == y_:
+            pli.ind += 1
+            print(f'Loaded, incrementing ind to {pli.ind}')
+        else:
+            pli.ind = 0
+            pli.x = x_
+            pli.y = y_
+            if (x_ == 5) and (y_ == 0):
+                pli.sel = dfj[('threshold', 'THD')].isnull() & dfj[('threshold', thresholders[1])].isnull()
+            elif (x_ == 5) and (y_ == 5):
+                pli.sel = dfj[('threshold', 'THD')].isnull() & ~dfj[('threshold', thresholders[1])].isnull()
+            elif (x_ == 5) and (y_ == -5):
+                pli.sel = ~dfj[('threshold', 'THD')].isnull() & dfj[('threshold', thresholders[1])].isnull()
+            else:
+                pli.sel = (dfj['threshold', 'diff'] >= (pli.y - binsize / 2)) & (
+                        dfj['threshold', 'diff'] < (pli.y + binsize / 2)) & \
+                          (dfj['threshold', 'THD'] >= (pli.x - binsize / 2)) & (
+                                  dfj['threshold', 'THD'] < (pli.x + binsize / 2))
+            pli.ephys_ids = dfj[pli.sel].index.get_level_values(level='ephys_id').values
+            print(f'There are {pli.sel.sum()} points in this cell: {pli.ephys_ids}')
+        print(f'**** {pli.ephys_ids[pli.ind]}')
+        print(dfj[pli.sel].iloc[pli.ind])
+
+        freq_str = f"{dfj[pli.sel].index.get_level_values(level='frequency')[pli.ind] / 1000:1.3f}"
+        # freq_str = f"{dfj[pli.sel].iloc[pli.ind]['frequency'] / 1000:1.3f}"
+        if freq_str[-2:] == '00':
+            freq_str = freq_str[:-2]
+        if freq_str == '5.656':
+            freq_str = '5.657'
+        if freq_str == '11.313':
+            freq_str = '11.314'
+        # fn = f"{dfj[pli.sel].iloc[pli.ind]['ephys_dir2']} {freq_str}kHz {thresholders[0]} threshold.svg"
+        study = dfj[pli.sel].reset_index().iloc[pli.ind]['study'].values[0]
+        path = study.split('-')[0] + '/' + study
+
+        if thresholders[0] == 'manual':
+            fn = f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0].split(' ')[0]} abr_io-group-combined-{freq_str}kHz-"
+            pth = f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/{fn}"
+            fns = os.listdir(f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/")
+            fns = [fn_ for fn_ in fns if (fn_.count(fn) > 0) and (fn_.count('.png') > 0)]
+            if len(fns) > 1:
+                print(f"Multilple files {fns}")
+                fns = fns[:1]
+            pth = f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/{fns[0]}"
+            img = Image.open(pth)
+            print(pth)
+            pli.axes[0].cla()
+            pli.axes[0].imshow(img)
+            pli.axes[0].axis('off')
+
+        else:
+            fn = f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]} {freq_str}kHz AUTO-{thresholders[0]} threshold.svg"
+            pth = f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/" \
+                  f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]}/{fn}"
+            try:
+                svg_file = open(pth, mode="rb")
+                print(pth)
+            except FileNotFoundError:
+                if freq_str == '5.657':
+                    freq_str = '5.656'
+                if freq_str == '11.314':
+                    freq_str = '11.313'
+                fn = f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]} {freq_str}kHz AUTO-{thresholders[0]} threshold.svg"
+                pth = f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/" \
+                      f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]}/{fn}"
+                svg_file = open(pth, mode="rb")
+                print('Changed freq from 5.657 to 5.656')
+
+            img_png = cairosvg.svg2png(bytestring=svg_file.read())
+            img = Image.open(BytesIO(img_png))
+            pli.axes[0].cla()
+            pli.axes[0].imshow(img)
+            pli.axes[0].axis('off')
+
+        if thresholders[1] == 'manual':
+            print('fix me')
+        else:
+            fn2 = f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]} {freq_str}kHz AUTO-{thresholders[1]} threshold.svg"
+            pth2 = f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/" \
+                   f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]}/{fn2}"
+            try:
+                svg_file = open(pth2, mode="rb")
+                print(pth2)
+            except FileNotFoundError:
+                if freq_str == '5.657':
+                    freq_str = '5.656'
+                if freq_str == '11.314':
+                    freq_str = '11.313'
+                fn = f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]} {freq_str}kHz AUTO-{thresholders[1]} threshold.svg"
+                pth2 = f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/" \
+                       f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]}/{fn}"
+                svg_file = open(pth2, mode="rb")
+                print('Changed freq from 5.657 to 5.656')
+
+            img_png = cairosvg.svg2png(bytestring=svg_file.read())
+            img = Image.open(BytesIO(img_png))
+            pli.axes[1].cla()
+            pli.axes[1].imshow(img)
+            pli.axes[1].axis('off')
+
+        plt.pause(.1)
+        plt.draw()
+
+    pli.ind = 0
+    pli.sel = None
+    pli.x = None
+    pli.y = None
+    pli.ephys_ids = None
+    if len(thresholders) <= 2:
+        pli.fig, pli.axes = plt.subplots(1, figsize=(16, 10),
+                                         gridspec_kw={'top': 1, 'bottom': 0, 'left': 0, 'right': 1})
+        _, axes2 = plt.subplots(1, figsize=(16, 10), gridspec_kw={'top': 1, 'bottom': 0, 'left': 0, 'right': 1})
+        pli.axes = np.array((pli.axes, axes2))
+    else:
+        pli = None
+    ax = plot_threshold_diffs(dfj, dfs_all, analyzers, as_diff=True, norm='by_column', fn=pli)
+    ax[-1, 0].set_xlabel(f'Median Threshold (dB SPL; {thresholders[0]})', fontsize=20)
+
+    # dfj.loc[dfj[('', 'status_message')].isnull(),('', 'status_message')] = ''
+    # ax = plot_threshold_diffs(dfj[dfj[('','status_message')].str.contains('power law')], dfs_all, analyzers, as_diff=True, norm='by_column', fn=pli)
+
+    subs = ut.get_subs(len(analyzers))
+    gs_kw = dict(hspace=0.1, wspace=0, left=0.08, right=.99, bottom=.1, top=.93)
+    fig, ax = plt.subplots(subs[1], subs[0], figsize=(5 * subs[0], 12), sharey='all', sharex='all',
+                           gridspec_kw=gs_kw)
+    if len(analyzers) == 1: ax = np.array(ax, ndmin=2)
+    C = dfj.corr(method='spearman')
+    for i in range(len(analyzers)):
+        ax.flat[i].plot([10, 115], [10, 115], '--k')
+        ax.flat[i].scatter(dfj[('threshold', 'THD')], dfj[('threshold', analyzers[i])], 3, 'k')
+        ax.flat[i].text(0, 0.99, f"spearman p = {C.loc[('threshold', 'THD'), ('threshold', analyzers[i])]:.2f}",
+                        transform=ax.flat[i].transAxes, va='top')
+        ax.flat[i].set_title(analyzers[i])
+        dfs_all.loc[analyzers[i], 'spearman'] = C.loc[('threshold', 'THD'), ('threshold', analyzers[i])]
+
+    [ax_.set_xlim([10, 115]) for ax_ in ax.flat]
+    [ax_.set_ylim([10, 115]) for ax_ in ax.flat]
+    [ax_.set_aspect('equal', 'box') for ax_ in ax.flat]
+    return df, dfs_all, dfj, thresholders, pli
+

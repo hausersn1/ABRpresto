@@ -17,6 +17,7 @@ dependencies = [
 	"pandas >=0.24.2",
 	"matplotlib >=3.0.0",
 	"setuptools_scm",
+	"cftsdata",
 ]
 dynamic = ["version"]
 

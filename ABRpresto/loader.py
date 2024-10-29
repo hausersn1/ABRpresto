@@ -11,7 +11,7 @@ class BaseLoader:
 
 
 class PSILoader(BaseLoader):
-
+    BaseLoader._type = 'PSI'
     def iter_path(self, path):
         '''
         Recursively scans for all datasets under the specified path. A dataset
@@ -53,10 +53,10 @@ class PSILoader(BaseLoader):
         epochs = fh.get_epochs_filtered()
         for freq, freq_df in epochs.groupby('frequency'):
             yield (freq, freq_df)
-
-
+    def get_save_path(self, path):
+        return path #Save results in folder of experiment
 class CSVLoader(BaseLoader):
-
+    BaseLoader._type = 'csv'
     def iter_path(self, path):
         '''
         Recursively scans for all datasets under the specified path. A dataset
@@ -95,6 +95,9 @@ class CSVLoader(BaseLoader):
             yield None, epochs
         except:
             raise IOError(f'{filename} not a well-formatted ABR single-trial file')
+
+    def get_save_path(self, path):
+        return path.parent #Save results in parent directory of where csv is
 
 
 LOADERS = {

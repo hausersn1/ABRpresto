@@ -30,6 +30,7 @@ def run_fit(path, loader, reprocess=False, XCsubargs=None, frequencies=None):
             'save_data_resamples': False  # use this to save intermediate data (from each resample)
         }
 
+    save_path = loader.get_save_path(path)
     print(f'Loading experiments from {path}')
     for freq, freq_df in loader.iter_experiments(path):
 
@@ -38,15 +39,15 @@ def run_fit(path, loader, reprocess=False, XCsubargs=None, frequencies=None):
                 if freq not in frequencies:
                     print(f"  skipping {freq:.0f} Hz")
                     continue
-            fig_filename = path.parent / f'{path.stem}_ABRpresto_fit {freq:.0f}.png'
-            json_filename = path.parent / f'{path.stem}_ABRpresto_fit {freq:.0f}.json'
+            fig_filename = save_path / f'{path.stem}_ABRpresto_fit {freq:.0f}.png'
+            json_filename = save_path / f'{path.stem}_ABRpresto_fit {freq:.0f}.json'
             if not reprocess and fig_filename.exists() and json_filename.exists():
                 print(f"  {freq:.0f} Hz already fit with ABRpresto")
                 continue
             print(f"  processing {freq:.0f} Hz")
         else:
-            fig_filename = path.parent / f'{path.stem}_ABRpresto_fit.png'
-            json_filename = path.parent / f'{path.stem}_ABRpresto_fit.json'
+            fig_filename = save_path / f'{path.stem}_ABRpresto_fit.png'
+            json_filename = save_path / f'{path.stem}_ABRpresto_fit.json'
             if not reprocess and fig_filename.exists() and json_filename.exists():
                 print(f"  already fit with ABRpresto")
                 continue

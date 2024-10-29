@@ -16,5 +16,5 @@ for i, freq in enumerate(example_freqs):
     ABRpresto.main.run_fit(pth, 'psi', frequencies=[freq])
 
     #Fit examples in csv format
-    pth = os.path.realpath(f'../example_data/Example_{i}.csv')
+    pth = os.path.realpath(f'../example_data/Example_{i+1}.csv')
     ABRpresto.main.run_fit(pth, 'csv')

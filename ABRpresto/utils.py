@@ -4,7 +4,9 @@ import json
 import scipy.optimize as optimize
 from pathlib import Path
 import pandas as pd
-
+import matplotlib.pyplot as plt
+from . import interactive_plots
+from PIL import Image
 
 def crossCorr(x1, x2, norm=False):
     x1 = x1 - np.mean(x1)
@@ -278,6 +280,21 @@ class AutoThJsonEncoder(json.JSONEncoder):
             return super().default(obj)
 
 def load_fits(pth, save=True, algorithm = 'ABRpresto'):
+    """
+            Loads fits by the algorithm specified stored in .json files, and returns dataframe. Optionally saves to csv.
+
+    Parameters
+        ----------
+        pth: string. Path within which to search (recursively) for .json files to load
+        algorithm: string, default ABRpresto. Algorithm to load data fromy: data to fit. Filenames are expected to be in the format:
+             *_{algorithm}_fit*.json
+        save: bool, default True. If True save loaded dataframe to csv in pth.
+
+    Outputs
+        ----------
+        df: dataframe of fitted threshold and some metadata. Edit this function to load more metadata if wanted.
+
+        """
     mouse_num = []
     timepoint = []
     ear = []
@@ -285,7 +302,8 @@ def load_fits(pth, save=True, algorithm = 'ABRpresto'):
     threshold = []
     status = []
     status_msg = []
-    for filename in Path(pth).glob(f'*_{algorithm}_fit*.json'):
+    pths = []
+    for filename in Path(pth).glob(f'**/*_{algorithm}_fit*.json'):
         if 'Copy' in str(filename):
             continue
         D = json.load(open(filename))
@@ -296,10 +314,11 @@ def load_fits(pth, save=True, algorithm = 'ABRpresto'):
         frequency.append(int(str(filename).split(' ')[-1].split('.')[0]))
         status.append(D['status'])
         status_msg.append(D['status_message'])
+        pths.append(filename.parent.joinpath(filename.name.replace('.json','.png')))
 
     df = pd.DataFrame(
         {'threshold': threshold, 'id': mouse_num, 'timepoint': timepoint, 'ear': ear, 'frequency': frequency,
-         'status': status, 'status_message': status_msg})
+         'status': status, 'status_message': status_msg, 'pth': pths})
     if save:
         save_pth = pth + f'{algorithm} thresholds.csv'
         df.to_csv(save_pth, index=False)
@@ -307,41 +326,39 @@ def load_fits(pth, save=True, algorithm = 'ABRpresto'):
     return df
 
 def compare_thresholds(df, thresholders, impute_infs=True):
-    def set_ephys_id(DF):
-        DF['ephys_id_no_freq'] = DF['study'] + '_ID' + DF['id'].astype('str') + \
-                                 '_' + 'W' + \
-                                 DF.timepoint.astype('str') + '_' + DF.ear
-        DF['ephys_id'] = DF['ephys_id_no_freq'] + \
-                         '_' + DF['frequency'].astype('float').round(-2).astype('int').astype('str')
-        DF['ephys_dir'] = DF['study'] + '_' + DF.timepoint_unit.str.slice(0, 1).str.upper() + DF.timepoint.astype(
-            'str') + \
-                          '_ID' + DF['id'].astype('str')
-        DF['ephys_dir2'] = DF['ephys_dir'] + '_' + DF.ear + '_' + DF.assay + ' abr_io ' + DF.group
-        # DF['ephys_id'] = DF['ephys_id_dir']                     '_' + DF['frequency'].astype('float').round(-2).astype('int').astype('str')
+    """
+            Creates scatter and histogram plots to compare one or more algorithms. If length of thresholders is 2,
+            plots will be interactive. Clicking on a point will pop up the data from that point.
 
-        return DF
+    Parameters
+        ----------
+        df: Dataframe of thresholds to compare
+        thresholders: list of strings. List of thresholders to compare. Can be longer than2, but interactive plots only
+                      work for length 2. Expects df to contain columns named
+                      '{thresholders[0]} threshold', '{thresholders[1]} threshold', etc.
+                      Thresholds will be compared with the first element in the list as reference.
+        impute_infs: bool, default True. If True impute inf anf -inf in dataframe to 5 dB higher and less than
+                     'min_level' and 'max_level', respectively. 'min_level' and 'max_level' should be columns of the
+                    dataframe. They're only needed if impute_infs is True
 
-    # for i in range(len(thresholders)):
-    #     df[i] = set_ephys_id(df[i].reset_index())
+    Outputs
+        ----------
+        df: dataframe used for plotting (after imputing if used)
+        df_summary: table of summary statistics for each thresholder beyond the first (and relative to the first)
+        pli: function handle of callback funtion run when clicking on 2d histogram. Used for debugging and data exploration.
+
+        """
 
     if impute_infs:
-        for v in ['threshold', 'XCsubpublic threshold', 'manual threshold']:
-            ii = np.isinf(df[v]) & (df[v] < 0);
-            df.loc[ii, v] = df.loc[ii, 'min_level'] - 5
-            ii = np.isinf(df[v]) & (df[v] > 0);
-            df.loc[ii, v] = df.loc[ii, 'max_level'] + 5
+        for thresholder in thresholders:
+            colname = thresholder + ' threshold'
+            ii = np.isinf(df[colname]) & (df[colname] < 0);
+            df.loc[ii, colname] = df.loc[ii, 'min_level'] - 5
+            ii = np.isinf(df[colname]) & (df[colname] > 0);
+            df.loc[ii, colname] = df.loc[ii, 'max_level'] + 5
 
-    if 'status_message' in df[1].keys():
-        C = df[1].set_index(DF_indicies)['status_message']
-        C.name = ('', 'status_message')
-        dfj = pd.concat((dfj, C.to_frame()), axis=1)
-
-    # dfj.loc[dfj[('', 'status_message')].isnull(), ('', 'status_message')] = ''
-    # dfj = dfj[dfj[('', 'status_message')].str.contains('power law')]
-
-    analyzers = thresholders[1:]
-    dfs_all = summarize_thd_diffs(dfj, analyzers, crits=(0, 5, 10))
-    dfj['threshold', 'diff'] = dfj['threshold', analyzers[0]] - dfj['threshold', 'THD']
+    df_summary = summarize_thd_diffs(df, thresholders[1:], reference_thresholder=thresholders[0], crits=(0, 5, 10))
+    df['threshold diff'] = df[thresholders[1] + ' threshold'] - df[thresholders[0] + ' threshold']
 
     binsize = 5
 
@@ -355,135 +372,244 @@ def compare_thresholds(df, thresholders, impute_infs=True):
             pli.x = x_
             pli.y = y_
             if (x_ == 5) and (y_ == 0):
-                pli.sel = dfj[('threshold', 'THD')].isnull() & dfj[('threshold', thresholders[1])].isnull()
+                pli.sel = df[thresholders[0] + ' threshold'].isnull() & df[(thresholders[1] + ' threshold')].isnull()
             elif (x_ == 5) and (y_ == 5):
-                pli.sel = dfj[('threshold', 'THD')].isnull() & ~dfj[('threshold', thresholders[1])].isnull()
+                pli.sel = df[thresholders[0] + ' threshold'].isnull() & ~df[(thresholders[1] + ' threshold')].isnull()
             elif (x_ == 5) and (y_ == -5):
-                pli.sel = ~dfj[('threshold', 'THD')].isnull() & dfj[('threshold', thresholders[1])].isnull()
+                pli.sel = ~df[thresholders[0] + ' threshold'].isnull() & df[(thresholders[1] + ' threshold')].isnull()
             else:
-                pli.sel = (dfj['threshold', 'diff'] >= (pli.y - binsize / 2)) & (
-                        dfj['threshold', 'diff'] < (pli.y + binsize / 2)) & \
-                          (dfj['threshold', 'THD'] >= (pli.x - binsize / 2)) & (
-                                  dfj['threshold', 'THD'] < (pli.x + binsize / 2))
-            pli.ephys_ids = dfj[pli.sel].index.get_level_values(level='ephys_id').values
-            print(f'There are {pli.sel.sum()} points in this cell: {pli.ephys_ids}')
-        print(f'**** {pli.ephys_ids[pli.ind]}')
-        print(dfj[pli.sel].iloc[pli.ind])
+                pli.sel = (df['threshold diff'] >= (pli.y - binsize / 2)) & (
+                        df['threshold diff'] < (pli.y + binsize / 2)) & \
+                          (df[thresholders[0] + ' threshold'] >= (pli.x - binsize / 2)) & (
+                                  df[thresholders[0] + ' threshold'] < (pli.x + binsize / 2))
+            pli.pths = df[pli.sel]['pth'].values
+            print(f'There are {pli.sel.sum()} points in this cell: {pli.pths}')
+        print(f'**** {pli.pths[pli.ind]}')
+        print(df[pli.sel].iloc[pli.ind])
 
-        freq_str = f"{dfj[pli.sel].index.get_level_values(level='frequency')[pli.ind] / 1000:1.3f}"
-        # freq_str = f"{dfj[pli.sel].iloc[pli.ind]['frequency'] / 1000:1.3f}"
-        if freq_str[-2:] == '00':
-            freq_str = freq_str[:-2]
-        if freq_str == '5.656':
-            freq_str = '5.657'
-        if freq_str == '11.313':
-            freq_str = '11.314'
-        # fn = f"{dfj[pli.sel].iloc[pli.ind]['ephys_dir2']} {freq_str}kHz {thresholders[0]} threshold.svg"
-        study = dfj[pli.sel].reset_index().iloc[pli.ind]['study'].values[0]
-        path = study.split('-')[0] + '/' + study
-
-        if thresholders[0] == 'manual':
-            fn = f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0].split(' ')[0]} abr_io-group-combined-{freq_str}kHz-"
-            pth = f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/{fn}"
-            fns = os.listdir(f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/")
-            fns = [fn_ for fn_ in fns if (fn_.count(fn) > 0) and (fn_.count('.png') > 0)]
-            if len(fns) > 1:
-                print(f"Multilple files {fns}")
-                fns = fns[:1]
-            pth = f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/{fns[0]}"
-            img = Image.open(pth)
-            print(pth)
-            pli.axes[0].cla()
-            pli.axes[0].imshow(img)
-            pli.axes[0].axis('off')
-
-        else:
-            fn = f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]} {freq_str}kHz AUTO-{thresholders[0]} threshold.svg"
-            pth = f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/" \
-                  f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]}/{fn}"
-            try:
-                svg_file = open(pth, mode="rb")
-                print(pth)
-            except FileNotFoundError:
-                if freq_str == '5.657':
-                    freq_str = '5.656'
-                if freq_str == '11.314':
-                    freq_str = '11.313'
-                fn = f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]} {freq_str}kHz AUTO-{thresholders[0]} threshold.svg"
-                pth = f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/" \
-                      f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]}/{fn}"
-                svg_file = open(pth, mode="rb")
-                print('Changed freq from 5.657 to 5.656')
-
-            img_png = cairosvg.svg2png(bytestring=svg_file.read())
-            img = Image.open(BytesIO(img_png))
-            pli.axes[0].cla()
-            pli.axes[0].imshow(img)
-            pli.axes[0].axis('off')
-
-        if thresholders[1] == 'manual':
-            print('fix me')
-        else:
-            fn2 = f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]} {freq_str}kHz AUTO-{thresholders[1]} threshold.svg"
-            pth2 = f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/" \
-                   f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]}/{fn2}"
-            try:
-                svg_file = open(pth2, mode="rb")
-                print(pth2)
-            except FileNotFoundError:
-                if freq_str == '5.657':
-                    freq_str = '5.656'
-                if freq_str == '11.314':
-                    freq_str = '11.313'
-                fn = f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]} {freq_str}kHz AUTO-{thresholders[1]} threshold.svg"
-                pth2 = f"X:/{path}/{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir'].values[0]}/" \
-                       f"{dfj[pli.sel].reset_index().iloc[pli.ind]['ephys_dir2'].values[0]}/{fn}"
-                svg_file = open(pth2, mode="rb")
-                print('Changed freq from 5.657 to 5.656')
-
-            img_png = cairosvg.svg2png(bytestring=svg_file.read())
-            img = Image.open(BytesIO(img_png))
-            pli.axes[1].cla()
-            pli.axes[1].imshow(img)
-            pli.axes[1].axis('off')
-
-        plt.pause(.1)
-        plt.draw()
+        pth = pli.pths[pli.ind]
+        img = Image.open(pth)
+        print(pth)
+        pli.axes.cla()
+        pli.axes.imshow(img)
+        pli.axes.axis('off')
 
     pli.ind = 0
     pli.sel = None
     pli.x = None
     pli.y = None
-    pli.ephys_ids = None
+    pli.pths = None
+
+    def pli_scatter(pth):
+        img = Image.open(pth)
+        print(pth)
+        pli_scatter.axes.cla()
+        pli_scatter.axes.imshow(img)
+        pli_scatter.axes.axis('off')
+
+    pli_scatter.ind = 0
+    pli_scatter.sel = None
+    pli_scatter.x = None
+    pli_scatter.y = None
+    pli_scatter.pths = None
+
     if len(thresholders) <= 2:
-        pli.fig, pli.axes = plt.subplots(1, figsize=(16, 10),
+        pli.fig, pli.axes = plt.subplots(1, figsize=(5, 8),
                                          gridspec_kw={'top': 1, 'bottom': 0, 'left': 0, 'right': 1})
-        _, axes2 = plt.subplots(1, figsize=(16, 10), gridspec_kw={'top': 1, 'bottom': 0, 'left': 0, 'right': 1})
-        pli.axes = np.array((pli.axes, axes2))
+        pli_scatter.axes = pli.axes
     else:
         pli = None
-    ax = plot_threshold_diffs(dfj, dfs_all, analyzers, as_diff=True, norm='by_column', fn=pli)
+        pli_scatter = None
+    ax = plot_threshold_diffs(df, df_summary, thresholders[1:], reference_thresholder=thresholders[0], as_diff=True, norm='by_column', fn=pli)
     ax[-1, 0].set_xlabel(f'Median Threshold (dB SPL; {thresholders[0]})', fontsize=20)
 
-    # dfj.loc[dfj[('', 'status_message')].isnull(),('', 'status_message')] = ''
-    # ax = plot_threshold_diffs(dfj[dfj[('','status_message')].str.contains('power law')], dfs_all, analyzers, as_diff=True, norm='by_column', fn=pli)
-
-    subs = ut.get_subs(len(analyzers))
     gs_kw = dict(hspace=0.1, wspace=0, left=0.08, right=.99, bottom=.1, top=.93)
-    fig, ax = plt.subplots(subs[1], subs[0], figsize=(5 * subs[0], 12), sharey='all', sharex='all',
+    fig, ax = plt.subplots(1, len(thresholders)-1, figsize=(5 , 12), sharey='all', sharex='all',
                            gridspec_kw=gs_kw)
-    if len(analyzers) == 1: ax = np.array(ax, ndmin=2)
-    C = dfj.corr(method='spearman')
-    for i in range(len(analyzers)):
+    if len(thresholders) == 2: ax = np.array(ax, ndmin=2)
+    for i, thresholder in enumerate(thresholders[1:]):
         ax.flat[i].plot([10, 115], [10, 115], '--k')
-        ax.flat[i].scatter(dfj[('threshold', 'THD')], dfj[('threshold', analyzers[i])], 3, 'k')
-        ax.flat[i].text(0, 0.99, f"spearman p = {C.loc[('threshold', 'THD'), ('threshold', analyzers[i])]:.2f}",
+        # ax.flat[i].scatter(df[thresholders[0] + ' threshold'], df[thresholder + ' threshold'], 3, 'k')
+        interactive_plots.scatter(df[thresholders[0] + ' threshold'].values, df[thresholder + ' threshold'].values,
+                                            df['pth'].values, ax=ax.flat[i], fn=pli_scatter, color='k')
+        ax.flat[i].text(0, 0.99, f"spearman p = {df_summary.loc[thresholder, 'spearman corr']:.2f}",
                         transform=ax.flat[i].transAxes, va='top')
-        ax.flat[i].set_title(analyzers[i])
-        dfs_all.loc[analyzers[i], 'spearman'] = C.loc[('threshold', 'THD'), ('threshold', analyzers[i])]
+        ax.flat[i].set_title(thresholders[i])
 
-    [ax_.set_xlim([10, 115]) for ax_ in ax.flat]
-    [ax_.set_ylim([10, 115]) for ax_ in ax.flat]
+    [ax_.set_xlim([7, 113]) for ax_ in ax.flat]
+    [ax_.set_ylim([7, 113]) for ax_ in ax.flat]
     [ax_.set_aspect('equal', 'box') for ax_ in ax.flat]
-    return df, dfs_all, dfj, thresholders, pli
+    return df, df_summary, pli
 
+def summarize_thd_diffs(df, thresholders, reference_thresholder, crits=(0, 5, 10), limits=None):
+    """
+                Creates a table of summary statistics for each thresholder relative to the reference_thresholder
+
+        Parameters
+            ----------
+            df: Dataframe of thresholds to summarize
+            thresholders: list of strings. List of thresholders to compare. Expects df to contain columns named
+                          '{thresholders[0]} threshold', '{thresholders[1]} threshold', etc.
+            reference_thresholder: Thresholds will be compared against this thresholder. Expects df to contain a column:
+                         '{reference_thresholder} threshold'
+            crits: tuple of floats, default (0,5,10). Criteria over which to quantify percent within +/- this value
+            limits: None or tuple of floats, must be length 2, ex (10, 110). If not None, data outside these limits will
+                    be set to these limits.
+
+        Outputs
+            ----------
+            df_summary: table of summary statistics for each thresholder (relative to the reference_thresholder)
+
+            """
+
+    df_ = df.copy()
+    DFS = pd.DataFrame(index=thresholders)
+    DFS2 = pd.DataFrame(index=thresholders)
+    for thresholder in thresholders:
+        if limits is not None:
+            df_.loc[(df_[thresholder + ' threshold'] < limits[0]), thresholder + ' threshold'] = limits[0]
+            df_.loc[(df_[thresholder + ' threshold'] > limits[1]), thresholder + ' threshold'] = limits[1]
+        df_['threshold diff'] = df_[thresholder + ' threshold'] - df_[reference_thresholder + ' threshold']
+        # DFS.loc[user, 'Ntotal'] = int((~np.isnan(df_['threshold diff'])).sum())
+        DFS2.loc[thresholder, 'MedianDiff'] = np.nanmedian(df_['threshold diff'])
+        DFS.loc[thresholder, 'Ntotal'] = int((~np.isnan(df_[reference_thresholder + ' threshold'])).sum())
+        crit_strs = []
+        for crit in crits:
+            if (type(crit) is str):
+                if (crit[0] == 'p'):
+                    DFS.loc[thresholder, f'N_below_{crit[1:]}dB'] = int((df_['threshold diff'] < -1*int(crit[1:])).sum())
+                    DFS.loc[thresholder, f'N_above_{crit[1:]}dB'] = int((df_['threshold diff'] > 1 * int(crit[1:])).sum())
+                    crit_strs.append(f'N_below_{crit[1:]}dB')
+                    crit_strs.append(f'N_above_{crit[1:]}dB')
+                else:
+                    raise RuntimeError(f'Invalid crit {crit}')
+            else:
+                DFS.loc[thresholder, f'N_within_{crit}dB'] = int((np.abs(df_['threshold diff']) <= crit).sum())
+                crit_strs.append(f'N_within_{crit}dB')
+        DFS.loc[thresholder, f'N_outside crit'] = \
+            int((np.abs(df_['threshold diff']) > np.array([crit for crit in crits if type(crit) is int]).max()).sum())
+        DFS.loc[thresholder, 'N NaN'] = int((np.isnan(df_['threshold diff']) &
+                                             ~np.isnan(df_[reference_thresholder + ' threshold'])).sum())
+
+    DFS = DFS.astype(int)
+    for thresholder in thresholders:
+        DFS.loc[thresholder, 'spearman corr'] = \
+            df_[[thresholder + ' threshold', reference_thresholder + ' threshold']].corr(method='spearman').values[0, 1]
+    for crit in crit_strs:
+        DFS[crit.replace('N_', 'perc_')] = DFS[crit] / DFS['Ntotal'] * 100
+    df_summary = pd.concat((DFS, DFS2), axis=1)
+    return df_summary
+
+def plot_threshold_diffs(df, df_summary, thresholders, reference_thresholder, as_diff=False, ax=None, norm=None,
+                         fn=None, limits=(10, 110)):
+    """
+            Creates 2d histogram plots to compare one or more algorithms. If length of thresholders is 1,
+            plots will be interactive. Clicking on a square will pop up the data from that square. Clicking again in the
+            same location will bring up more data from that square if it exists
+
+    Parameters
+        ----------
+        df: Dataframe of thresholds to compare
+        df_summary: table of summary statistics for each thresholder
+        thresholders: list of strings. List of thresholders to compare. Expects df to contain columns named
+                            '{thresholders[0]} threshold', '{thresholders[1]} threshold', etc.
+        reference_thresholder: Thresholds will be compared against this thresholder. Expects df to contain a column:
+                           '{reference_thresholder} threshold'
+        as_diff: bool, default False. impute_infs: If True plot as difference histogram
+        norm: one of {None, 'by_column'} If 'by_column', normalized within each column of the histogram
+        ax: Axes in which to make plot. Is not passed axes will be created
+        fn: Callback funtion to be called when clicking a square
+
+
+    Outputs
+        ----------
+        df: dataframe used for plotting (after imputing if used)
+
+        pli: function handle of callback funtion run when clicking on 2d histogram. Used for debugging and data exploration.
+
+        """
+    """
+        Creates a table of summary statistics for each thresholder relative to the reference_thresholder
+
+          Parameters
+              ----------
+              df: Dataframe of thresholds to summarize
+              thresholders: list of strings. List of thresholders to compare. Expects df to contain columns named
+                            '{thresholders[0]} threshold', '{thresholders[1]} threshold', etc.
+              reference_thresholder: Thresholds will be compared against this thresholder. Expects df to contain a column:
+                           '{reference_thresholder} threshold'
+              crits: tuple of floats, default (0,5,10). Criteria over which to quantify percent within +/- this value
+              limits: Tuple of floats, default (10, 110). Data will be limited to these values. Vertical lines inside
+                       will be drawn to indicate values that were infinite and were imputer.
+
+
+              """
+
+    percs = df_summary.keys()[df_summary.keys().str.contains('perc_within')].values
+    percs_num = [p.split('_')[2][:-2] for p in percs]
+    min_val = 10
+    max_val = 110
+    bin_step = 5
+    xbins = np.arange(min_val - bin_step, max_val + 2 * bin_step, bin_step) - bin_step / 2
+    # print(xbins)
+    if norm == 'by_column':
+        vmin = 0
+        vmax = 1
+    else:
+        vmin = None
+        vmax = None
+    if as_diff:
+        ybins = np.arange(-42.5, 42.5 + bin_step, bin_step) - bin_step / 2
+        # ybins = np.append(np.append(np.arange(-50,0,bin_step),[-1,1]),np.arange(5,50+bin_step,bin_step))
+    else:
+        ybins = xbins
+    make_axes = ax is None
+    if make_axes:
+        fig, ax = plt.subplots(1, len(thresholders), figsize=(12,10))
+        ax = np.array(ax, ndmin=2)
+    if len(thresholders) == 1:
+        fs = 20
+        ls = 14
+    else:
+        fs = 12
+        ls = 12
+    axf = ax.flatten()
+    for n, thresholder in enumerate(thresholders):
+        y = df[thresholder + ' threshold'].copy()
+        y.loc[y > limits[1]] = limits[1]
+        y.loc[y < limits[0]] = limits[0]
+        ylabel = 'Individual Threshold (dB SPL)'
+        if as_diff:
+            y = y - df[reference_thresholder + ' threshold']
+            ylabel = 'Difference (Individual - Median)'
+        H, xedges, yedges = np.histogram2d(df[reference_thresholder + ' threshold'], y, bins=(xbins, ybins))
+        # X, Y = np.meshgrid(xedges, yedges)
+        if norm == 'by_column':
+            H = (H.T / H.sum(axis=1)).T
+
+        # interactive_plots.pcolor(X, Y, H.T, cmap='gray_r', vmin=vmin, vmax=vmax, ax=axf[n])
+        ph = interactive_plots.pcolor(xedges, yedges, H.T, cmap='gray_r', vmin=vmin, vmax=vmax, ax=axf[n], mesh=False, fn=fn)
+        cbh = plt.colorbar(ph)
+        cbh.set_ticks((0, .5, 1), labels=('0', '50', '100'))
+        cbh.set_label(label='Percent of Occurrences', fontsize=20)
+        if as_diff:
+            y_line = 10 # 7.5
+            axf[n].plot(xbins[[0, -1]], (-1*y_line, -1*y_line), '--k', linewidth=1)
+            axf[n].plot(xbins[[0, -1]], (y_line, y_line), '--k', linewidth=1)
+
+        axf[n].set_title(f'{thresholder}: [{df_summary.loc[thresholder, percs[0]]:.0f},  {df_summary.loc[thresholder, percs[1]]:.0f},'
+                         f'  {df_summary.loc[thresholder, percs[2]]:.0f}]%, N={df_summary.loc[thresholder, "Ntotal"]}, Nnan={df_summary.loc[thresholder,"N NaN"]}', fontsize=fs)
+        axf[n].set_aspect('equal', 'box')
+        axf[n].axvline(limits[0] + bin_step/2, ls='--', color='darkred', linewidth=1)
+        axf[n].axvline(limits[1] - bin_step/2, ls='--', color='darkred', linewidth=1)
+
+    [ax_.tick_params(axis='both', labelsize=ls) for ax_ in axf]
+    if make_axes:
+        ax[-1, 0].set_xlabel('Median Threshold (dB SPL)', fontsize=fs)
+        ax[-1, 0].set_ylabel(ylabel, fontsize=fs)
+    thresholder = thresholders[0]
+    if make_axes:
+        axf[0].set_title(
+            f'   [0,  $\\pm{percs_num[1]}$, $\\pm{percs_num[2]}$] dB\n{thresholder}: [{df_summary.loc[thresholder, percs[0]]:.0f},  {df_summary.loc[thresholder, percs[1]]:.0f},'
+            f'  {df_summary.loc[thresholder, percs[2]]:.0f}]%, N={df_summary.loc[thresholder, "Ntotal"]}, Nnan={df_summary.loc[thresholder,"N NaN"]}', fontsize=fs)
+    return ax

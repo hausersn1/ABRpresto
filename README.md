@@ -53,6 +53,16 @@ To recursively scan and process all datasets in a folder:
 
 	ABRpresto <path> -r
 
+For example, to fit all example psi data (same data, different format), navigate to the ABRpresto directory, then run:
+    
+    ABRpresto example_data_psi -r
+
+To fit all example csv data, you just need to add the loader option to use the csv data loader.
+Navigate to the ABRpresto directory, then run: 
+ 
+    ABRpresto example_data -r --loader csv
+
+
 ## Citation
 
 If you use this algorithm in you research, please cite:

@@ -9,8 +9,10 @@ from ABRpresto import utils
 from ABRpresto.loader import LOADERS
 
 
-def run_fit(path, loader, reprocess=False, XCsubargs=None):
+def run_fit(path, loader, reprocess=False, XCsubargs=None, frequencies=None):
     path = Path(path)
+    if type(loader) is str:
+        loader = LOADERS[loader]
 
     if XCsubargs is None:
         XCsubargs = {
@@ -30,7 +32,12 @@ def run_fit(path, loader, reprocess=False, XCsubargs=None):
 
     print(f'Loading experiments from {path}')
     for freq, freq_df in loader.iter_experiments(path):
+
         if freq is not None:
+            if frequencies is not None:
+                if freq not in frequencies:
+                    print(f"  skipping {freq:.0f} Hz")
+                    continue
             fig_filename = path.parent / f'{path.stem}_ABRpresto_fit {freq:.0f}.png'
             json_filename = path.parent / f'{path.stem}_ABRpresto_fit {freq:.0f}.json'
             if not reprocess and fig_filename.exists() and json_filename.exists():
@@ -70,8 +77,11 @@ def main_process():
 
     if args.recursive:
         for path in args.paths:
-            for exp_path in loader.iter_path(path):
+            i = None
+            for i, exp_path in enumerate(loader.iter_path(path)):
                 run_fit(exp_path, loader, args.reprocess)
+            if i is None:
+                print(f'No data found in {path} with {loader} format.')
     else:
         for path in args.paths:
             run_fit(path, loader, args.reprocess)

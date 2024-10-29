@@ -1,6 +1,8 @@
 ABRpresto/_version.py
-example_data*/*.json
-example_data*/*.png
+example_data_psi/*/*.json
+example_data_psi/*/*.png
+example_data/*.json
+example_data/*.png
 
 *.DS_Store
 

@@ -29,7 +29,7 @@ directly into your main Python environment):
 
 ## Usage
 
-Example data is provided in both `csv` format ([example_data](scripts)) and `psi` format ([example_data_psi](scripts)) and two example scripts [Example_fit_script.py](scripts%2FExample_fit_script.py) and [Example_fit_script_psi.py](scripts%2FExample_fit_script_psi.py) demonstrate how each of these datasets can be fit using ABRpresto.
+Example data is provided in both `csv` format ([example_data](example_data)) and `psi` format ([example_data_psi](example_data_psi)) and two example scripts [Example_fit_script.py](scripts%2FExample_fit_script.py) and [Example_fit_script_psi.py](scripts%2FExample_fit_script_psi.py) demonstrate how each of these datasets can be fit using ABRpresto.
 
 The algorithm requires data to be passed as a pandas dataframe with a multiindex containing `polarity` and `level`. Extra levels in the index will be ignored (e.g., `t0` in the example datasets). Each row contains a single trial. Columns are the time relative to stimulus onsset in seconds. A dictionary of results and a figure are returned, which can be saved as json and png.
 

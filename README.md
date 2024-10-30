@@ -1,5 +1,5 @@
 # ABRpresto
-ABR thresholds, fast, accurate, no human needed.
+ABR thresholds: fast, accurate, no human needed.
 
 An algorithm for generating ABR thresholds by cross-correlation of resampled subaverages
 

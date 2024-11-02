@@ -31,13 +31,18 @@ directly into your main Python environment):
 
 ## Usage
 
-Example data is provided in both `csv` format ([example_data](example_data)) and `psi` format ([example_data_psi](example_data_psi)) and two example scripts [Example_fit_script.py](scripts%2FExample_fit_script.py) and [Example_fit_script_psi.py](scripts%2FExample_fit_script_psi.py) demonstrate how each of these datasets can be fit using ABRpresto.
+Example data is provided in both `csv` format ([example_data](example_data)) and `psi` format ([example_data_psi](example_data_psi)) and two example scripts [Example_fit_script.py](scripts%2FExample_fit_script.py) and [Example_fit_script_psi.py](scripts%2FExample_fit_script_psi.py) demonstrate how each of these datasets can be fit using ABRpresto. [Fit_all_examples.py](scripts%2FFit_all_examples.py) illustrates how ABR.main.run_fit can be called from a script to fit a folder of data.
 
-The algorithm requires data to be passed as a pandas dataframe with a multiindex containing `polarity` and `level`. Extra levels in the index will be ignored (e.g., `t0` in the example datasets). Each row contains a single trial. Columns are the time relative to stimulus onsset in seconds. A dictionary of results and a figure are returned, which can be saved as json and png.
+For CSV data, the algorithm requires data to be passed as a pandas dataframe with a multiindex containing `polarity` and `level`. Extra levels in the index will be ignored (e.g., `t0` in the example datasets). Each row contains a single trial. Columns are the time relative to stimulus onsset in seconds. A dictionary of results and a figure are returned, which can be saved as json and png.
 
 ### Figure output
-
 In the left column the figures show mean +/- SE of all trials in black, and median (or mean, depending on AVmode) for the two subsets. Waveforms are normalized (for each level all 3 lines are scaled by the peak-to-peak of the mean of all trials). The right hand side shows mean correlation coefficient vs stimulus level. Sigmoid and power law fits to this data are shown in green and purple. The threshold is shown by the pink dashed line.
+
+### Aggregating fit threhsolds and plotting algorithm performance
+[Example_plot_performance.py](scripts%2FExample_plot_performance.py) illustrates how [ABRpresto.utils.load_fits](ABRpresto%2Futils.py#L282) can be used to load the fitted thresholds (stored as individual .json files), and aggregate them into a single dataframe that can be saved to a .csv file. It also shows how to use  [ABRpresto.utils.compare_thresholds](ABRpresto%2Futils.py#L328) to create an interactive plot comparing the thresholds between two thresholders (in this case between manual (human) determined thresholds and those determined by ABRpresto).
+
+A full dataset of single-trial ABR waveforms used to test this algorithm is available on [Zenodo](https://zenodo.org/records/13987792).
+
 
 ### Command line usage
 

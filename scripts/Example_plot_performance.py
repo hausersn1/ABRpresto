@@ -1,7 +1,7 @@
 import ABRpresto.utils
 import os
 import matplotlib
-# matplotlib.use('TkAgg')
+matplotlib.use('TkAgg')
 import pandas as pd
 
 
@@ -10,7 +10,7 @@ import pandas as pd
 
 # Parameters
 # Path to ABRpresto dataset (or another dataset you want to plot the performance of).
-pth = 'C:/Data/ABRpresto data/'  #If you download the full dataset, use this.
+# pth = 'C:/Data/ABRpresto data/'  #If you download the full dataset, use this.
 pth = os.path.realpath(f'../example_data') + '/'  # use this to just plot the example data
 
 #Change this to a different algorithm to load and compare other data

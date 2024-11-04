@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from scipy import signal
 import json
@@ -6,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 from . import interactive_plots
+from .loader import PSILoader
 from PIL import Image
 
 def crossCorr(x1, x2, norm=False):
@@ -278,6 +280,27 @@ class AutoThJsonEncoder(json.JSONEncoder):
             return f'{obj.__module__}.{obj.__name__}'
         else:
             return super().default(obj)
+
+def Psi_to_csv_all(Psi_data_path, target_path, reprocess=False):
+    path = Path(Psi_data_path)
+    print(f'Converting all data in "{path}" to csv:')
+    for i, exp_path in enumerate(PSILoader.iter_path(None, path)):
+        Psi_to_csv(exp_path, target_path, reprocess=reprocess)
+
+
+def Psi_to_csv(Psi_data_path, target_path, reprocess=False):
+    os.makedirs(target_path, exist_ok=True)
+    path = Path(Psi_data_path)
+    print(f'Converting {path} to csv:')
+    for freq, freq_df in PSILoader.iter_experiments(None, path):
+        csv_path = Path(target_path) / f'{path.stem} {freq:.0f}.csv'
+        if not reprocess and csv_path.exists():
+            print(f"  {freq:.0f} Hz already fit with ABRpresto")
+            continue
+        freq_df.index = freq_df.index.droplevel('frequency')
+        freq_df.to_csv(csv_path)
+        print(f"    wrote {csv_path}")
+
 
 def load_fits(pth, save=True, algorithm = 'ABRpresto'):
     """

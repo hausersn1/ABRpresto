@@ -55,6 +55,8 @@ class PSILoader(BaseLoader):
             yield (freq, freq_df)
     def get_save_path(self, path):
         return path #Save results in folder of experiment
+
+
 class CSVLoader(BaseLoader):
     BaseLoader._type = 'csv'
     def iter_path(self, path):

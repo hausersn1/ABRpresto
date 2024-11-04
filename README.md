@@ -31,7 +31,9 @@ directly into your main Python environment):
 
 ## Usage
 
-Example data is provided in both `csv` format ([example_data](example_data)) and `psi` format ([example_data_psi](example_data_psi)) and two example scripts [Example_fit_script.py](scripts%2FExample_fit_script.py) and [Example_fit_script_psi.py](scripts%2FExample_fit_script_psi.py) demonstrate how each of these datasets can be fit using ABRpresto. [Fit_all_examples.py](scripts%2FFit_all_examples.py) illustrates how ABR.main.run_fit can be called from a script to fit a folder of data.
+Example data is provided in both `csv` format ([example_data](example_data)) and `psi` format ([example_data_psi](example_data_psi)).\
+Two example scripts [Example_fit_script.py](scripts%2FExample_fit_script.py) and [Example_fit_script_psi.py](scripts%2FExample_fit_script_psi.py) demonstrate how each of these datasets can be fit using ABRpresto.\
+[Fit_all_examples.py](scripts%2FFit_all_examples.py) illustrates how [ABR.main.run_fit](ABRpresto%2Fmain.py#L12) can be called from a script to fit a folder of data.
 
 For CSV data, the algorithm requires data to be passed as a pandas dataframe with a multiindex containing `polarity` and `level`. Extra levels in the index will be ignored (e.g., `t0` in the example datasets). Each row contains a single trial. Columns are the time relative to stimulus onsset in seconds. A dictionary of results and a figure are returned, which can be saved as json and png.
 
@@ -41,7 +43,17 @@ In the left column the figures show mean +/- SE of all trials in black, and medi
 ### Aggregating fit threhsolds and plotting algorithm performance
 [Example_plot_performance.py](scripts%2FExample_plot_performance.py) illustrates how [ABRpresto.utils.load_fits](ABRpresto%2Futils.py#L282) can be used to load the fitted thresholds (stored as individual .json files), and aggregate them into a single dataframe that can be saved to a .csv file. It also shows how to use  [ABRpresto.utils.compare_thresholds](ABRpresto%2Futils.py#L328) to create an interactive plot comparing the thresholds between two thresholders (in this case between manual (human) determined thresholds and those determined by ABRpresto).
 
+### Using the full dataset
 A full dataset of single-trial ABR waveforms used to test this algorithm is available on [Zenodo](https://zenodo.org/records/13987792).
+To fit this data using the ABRpresto algorithm, extract the data to a folder and run ABRpresto on the command line:
+
+    ABRpresto <path to full dataset> -r
+
+For example, if you extract the data to `C:/Data/ABRpresto data` run
+
+    ABRpresto "C:/Data/ABRpresto data" -r
+
+You can also convert this data to csv format using the included functions, see [Example_convert_psi_to_csv.py](scripts%2FExample_convert_psi_to_csv.py)
 
 
 ### Command line usage
@@ -73,7 +85,8 @@ Navigate to the ABRpresto directory, then run:
 ## Citation
 
 If you use this algorithm in you research, please cite:
-XXX
+Shaheen, L. A., Buran, B. N., Suthakar, K., Koehler, S. D., & Chung, Y. (2024). ABRpresto: An algorithm for automatic thresholding of the Auditory Brainstem Response using resampled cross-correlation across subaverages. bioRxiv. https://doi.org/10.1101/2024.10.31.621303
+
 
 The curve fitting decision tree used in this algorithm was inspired by Suthakar et al. If you use this algorithm please 
  also cite their paper:

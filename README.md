@@ -41,7 +41,15 @@ In the left column the figures show mean +/- SE of all trials in black, and medi
 ### Aggregating fit threhsolds and plotting algorithm performance
 [Example_plot_performance.py](scripts%2FExample_plot_performance.py) illustrates how [ABRpresto.utils.load_fits](ABRpresto%2Futils.py#L282) can be used to load the fitted thresholds (stored as individual .json files), and aggregate them into a single dataframe that can be saved to a .csv file. It also shows how to use  [ABRpresto.utils.compare_thresholds](ABRpresto%2Futils.py#L328) to create an interactive plot comparing the thresholds between two thresholders (in this case between manual (human) determined thresholds and those determined by ABRpresto).
 
+### Using the full dataset
 A full dataset of single-trial ABR waveforms used to test this algorithm is available on [Zenodo](https://zenodo.org/records/13987792).
+To fit this data using the ABRpresto algorithm, extract the data to a folder and run ABRpresto on the command line:
+
+    ABRpresto <path to full dataset> -r
+
+For example, if you extract the data to `C:/Data/ABRpresto data` run
+
+    ABRpresto "C:/Data/ABRpresto data" -r
 
 
 ### Command line usage
@@ -73,7 +81,8 @@ Navigate to the ABRpresto directory, then run:
 ## Citation
 
 If you use this algorithm in you research, please cite:
-XXX
+Shaheen, L. A., Buran, B. N., Suthakar, K., Koehler, S. D., & Chung, Y. (2024). ABRpresto: An algorithm for automatic thresholding of the Auditory Brainstem Response using resampled cross-correlation across subaverages. bioRxiv. https://doi.org/10.1101/2024.10.31.621303
+
 
 The curve fitting decision tree used in this algorithm was inspired by Suthakar et al. If you use this algorithm please 
  also cite their paper:

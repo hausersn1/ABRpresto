@@ -282,21 +282,21 @@ class AutoThJsonEncoder(json.JSONEncoder):
             return super().default(obj)
 
 
-def Psi_to_csv_all(Psi_data_path, target_path, reprocess=False):
+def Psi_to_csv_all(Psi_data_path, target_path, reprocess=False, load_options=None):
     path = Path(Psi_data_path)
     print(f'Converting all data in "{path}" to csv:')
     for i, exp_path in enumerate(PSILoader.iter_path(None, path)):
-        Psi_to_csv(exp_path, target_path, reprocess=reprocess)
+        Psi_to_csv(exp_path, target_path, reprocess=reprocess, load_options=load_options)
 
 
-def Psi_to_csv(Psi_data_path, target_path, reprocess=False):
+def Psi_to_csv(Psi_data_path, target_path, reprocess=False, load_options=None):
     os.makedirs(target_path, exist_ok=True)
     path = Path(Psi_data_path)
     print(f'Converting {path} to csv:')
-    for freq, freq_df in PSILoader.iter_experiments(None, path):
+    for freq, freq_df in PSILoader.iter_experiments(None, path, load_options):
         csv_path = Path(target_path) / f'{path.stem} {freq:.0f}.csv'
         if not reprocess and csv_path.exists():
-            print(f"  {freq:.0f} Hz already fit with ABRpresto")
+            print(f"  {freq:.0f} Hz already exported to csv")
             continue
         freq_df.index = freq_df.index.droplevel('frequency')
         freq_df.to_csv(csv_path)

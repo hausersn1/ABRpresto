@@ -28,7 +28,7 @@ class PSILoader(BaseLoader):
         for filename in Path(path).glob('**/*abr_io/erp_metadata.csv'):
             yield filename.parent
 
-    def iter_experiments(self, path):
+    def iter_experiments(self, path, load_options=None):
         '''
         Iterate through experiments found in the dataset.
 
@@ -39,6 +39,8 @@ class PSILoader(BaseLoader):
         ----------
         path : {str, Path}
             Path to experiment to load. Experiment must be in cftsdata format.
+        load_options: dict
+            Options for loading data, see cftsdata.abr.get_epochs_filtered
 
         Returns
         -------
@@ -47,12 +49,15 @@ class PSILoader(BaseLoader):
             single trial data) for that frequency.
         '''
         from cftsdata import abr
+        if load_options is None:
+            load_options = {}
         if not (path / 'erp_metadata.csv').exists():
             raise ValueError(f'{path} does not contain ABR data')
         fh = abr.load(path)
-        epochs = fh.get_epochs_filtered()
+        epochs = fh.get_epochs_filtered(**load_options)
         for freq, freq_df in epochs.groupby('frequency'):
             yield (freq, freq_df)
+
     def get_save_path(self, path):
         return path #Save results in folder of experiment
 

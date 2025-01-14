@@ -429,7 +429,7 @@ def plot_fit(levels, levels_, xc0, ABRtime, epochs_means, epochs_sems, pst_range
     else:
         ii = np.full(ABRtime.shape, True)
 
-    fig_handle, ax = plt.subplots(1, 2, figsize=(7, 10), gridspec_kw={'hspace': 0.07, 'wspace': .25, 'top': 1, 'bottom': 0.07,
+    fig_handle, ax = plt.subplots(1, 2, figsize=(12, 10), gridspec_kw={'hspace': 0.07, 'wspace': .25, 'top': 1, 'bottom': 0.07,
                                                                'left': .07, 'right': 1, 'width_ratios': [.4, .6]})
     for level in levels_:
         i = np.where(level == levels)[0][0]

@@ -17,7 +17,7 @@ def run_fit(path, loader, reprocess=False, XCsubargs=None, frequencies=None):
     if XCsubargs is None:
         XCsubargs = {
             'seed': 0,
-            'pst_range': [0.0005, 0.006],
+            'pst_range': [0.003, 0.02],   #[0.0005, 0.006],
             'N_shuffles': 500,
             'avmode': 'median',
             'peak_lag_threshold': 0.5,
